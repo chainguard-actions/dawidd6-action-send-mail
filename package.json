@@ -1,0 +1,11 @@
+{
+  "name": "action-send-mail",
+  "type": "module",
+  "main": "main.js",
+  "dependencies": {
+    "@actions/core": "^3.0.0",
+    "@actions/glob": "^0.6.1",
+    "nodemailer": "^8.0.2",
+    "showdown": "^1.9.1"
+  }
+}
