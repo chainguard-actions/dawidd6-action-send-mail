@@ -1,6 +1,12 @@
 # dawidd6/action-send-mail
 
-Hardened GitHub Action by [Chainguard](https://www.chainguard.dev).
+Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at [https://github.com/dawidd6/action-send-mail](https://github.com/dawidd6/action-send-mail).
+
+## Versions
+
+| Version | Tag | Upstream commit |
+|---------|-----|-----------------|
+| v16 | [`v16`](https://github.com/chainguard-actions/action-send-mail/tree/v16) | — |
 
 ## Privacy
 
