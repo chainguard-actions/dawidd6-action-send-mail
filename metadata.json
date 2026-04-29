@@ -1,5 +1,6 @@
 {
   "owner": "dawidd6",
   "name": "action-send-mail",
-  "visibility": ""
+  "visibility": "internal",
+  "description": ":gear: A GitHub Action to send an email to multiple recipients"
 }
