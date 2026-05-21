@@ -8,7 +8,7 @@ Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at
 
 | Version | Tag | Upstream commit |
 |---------|-----|-----------------|
-| v16 | [`v16`](https://github.com/chainguard-actions/dawidd6--action-send-mail/tree/v16) | — |
+| v16 | [`v16`](https://github.com/chainguard-actions/dawidd6-action-send-mail/tree/v16) | — |
 
 ## Privacy
 
