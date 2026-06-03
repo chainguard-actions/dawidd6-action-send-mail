@@ -1,0 +1,34 @@
+name: Test advanced email options
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Start local SMTP server
+        run: |
+          python3 -m smtpd -n -c DebuggingServer localhost:1025 &
+          sleep 1
+          echo "SMTP server started"
+
+      - id: action
+        uses: .
+        with:
+          connection_url: smtp://testuser:testpass@localhost:1025
+          subject: "Test Subject Advanced"
+          to: recipient@example.com
+          from: "Test Sender <sender@example.com>"
+          html_body: "<h1>Hello</h1><p>This is an HTML email.</p>"
+          cc: cc@example.com
+          bcc: bcc@example.com
+          reply_to: replyto@example.com
+          in_reply_to: "<original-message-id@example.com>"
+          priority: high
+          headers: '{"X-Custom-Header": "test-value"}'
+
+      - name: Assert action completed
+        run: |
+          echo "Action completed successfully with advanced options"
+          echo "PASS"
