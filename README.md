@@ -1,6 +1,6 @@
 # dawidd6/action-send-mail
 
-:gear: A GitHub Action to send an email to multiple recipients
+Send an email to multiple recipients
 
 Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at [https://github.com/dawidd6/action-send-mail](https://github.com/dawidd6/action-send-mail).
 
@@ -9,6 +9,7 @@ Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at
 | Version | Tag | Upstream commit |
 |---------|-----|-----------------|
 | v16 | [`v16`](https://github.com/chainguard-actions/dawidd6-action-send-mail/tree/v16) | — |
+| v17 | [`v17`](https://github.com/chainguard-actions/dawidd6-action-send-mail/tree/v17) | [`42942bc`](https://github.com/dawidd6/action-send-mail/commit/42942bc2f8fba4e611b459a018967a6a7c78c68c) |
 
 ## Privacy
 
