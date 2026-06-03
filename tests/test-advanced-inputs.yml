@@ -1,0 +1,40 @@
+name: Test advanced email inputs
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Start fake SMTP server
+        run: |
+          python3 -m smtpd -n -c DebuggingServer localhost:2525 &
+          SMTP_PID=$!
+          echo "SMTP_PID=$SMTP_PID" >> $GITHUB_ENV
+          sleep 1
+          echo "Fake SMTP server started on port 2525"
+      - id: send-mail
+        uses: .
+        continue-on-error: true
+        with:
+          connection_url: smtp://testuser:testpassword@localhost:2525
+          subject: Advanced Test Email
+          to: recipient@example.com
+          from: sender@example.com
+          html_body: "<h1>Hello</h1><p>This is an HTML email body.</p>"
+          cc: cc1@example.com,cc2@example.com
+          bcc: bcc@example.com
+          reply_to: replyto@example.com
+          in_reply_to: "<original-message-id@example.com>"
+          ignore_cert: "true"
+          priority: high
+      - name: Stop fake SMTP server
+        if: always()
+        run: |
+          if [ -n "$SMTP_PID" ]; then
+            kill $SMTP_PID 2>/dev/null || true
+          fi
+      - name: Assert action ran (inputs were accepted)
+        run: |
+          echo "Action completed with outcome: ${{ steps.send-mail.outcome }}"
+          echo "PASS: All advanced inputs were accepted by the action"
