@@ -1,0 +1,74 @@
+name: Test attachments and nodemailer logging options
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      mailhog:
+        image: mailhog/mailhog:v1.0.1
+        ports:
+          - 1025:1025
+          - 8025:8025
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create attachment file
+        run: |
+          echo "This is a test attachment file." > /tmp/test-attachment.txt
+          echo "It has multiple lines." >> /tmp/test-attachment.txt
+
+      - id: send
+        uses: .
+        with:
+          server_address: localhost
+          server_port: "1025"
+          secure: "false"
+          subject: "Attachments and Logging Test"
+          from: sender@example.com
+          to: recipient@example.com
+          body: "This email has an attachment and logging enabled."
+          attachments: /tmp/test-attachment.txt
+          nodemailerlog: "true"
+          nodemailerdebug: "true"
+
+      - name: Assert email was received
+        run: |
+          sleep 2
+          RESPONSE=$(curl -s http://localhost:8025/api/v2/messages)
+          echo "Mailhog response: $RESPONSE"
+          COUNT=$(echo "$RESPONSE" | grep -o '"total":[0-9]*' | grep -o '[0-9]*')
+          echo "Email count: $COUNT"
+          if [ -z "$COUNT" ] || [ "$COUNT" -lt 1 ]; then
+            echo "FAIL: Expected at least 1 email in mailhog, got: $COUNT"
+            exit 1
+          fi
+          echo "PASS: $COUNT email(s) received"
+
+      - name: Assert subject
+        run: |
+          RESPONSE=$(curl -s http://localhost:8025/api/v2/messages)
+          SUBJECT=$(echo "$RESPONSE" | python3 -c "import sys,json; msgs=json.load(sys.stdin)['items']; print(msgs[0]['Content']['Headers']['Subject'][0])" 2>/dev/null || echo "")
+          echo "Subject: $SUBJECT"
+          if [ "$SUBJECT" != "Attachments and Logging Test" ]; then
+            echo "FAIL: Expected subject 'Attachments and Logging Test', got '$SUBJECT'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert attachment is present
+        run: |
+          RESPONSE=$(curl -s http://localhost:8025/api/v2/messages)
+          MIME_PARTS=$(echo "$RESPONSE" | python3 -c "
+          import sys, json
+          msgs = json.load(sys.stdin)['items']
+          msg = msgs[0]
+          parts = msg.get('MIME', {}).get('Parts', [])
+          print(len(parts))
+          " 2>/dev/null || echo "0")
+          echo "MIME parts count: $MIME_PARTS"
+          if [ -z "$MIME_PARTS" ] || [ "$MIME_PARTS" -lt 2 ]; then
+            echo "FAIL: Expected at least 2 MIME parts (body + attachment), got: $MIME_PARTS"
+            exit 1
+          fi
+          echo "PASS: Email has $MIME_PARTS MIME parts (attachment present)"

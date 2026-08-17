@@ -1,0 +1,66 @@
+name: Test envelope, auth, and cert options
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      mailhog:
+        image: mailhog/mailhog:v1.0.1
+        ports:
+          - 1025:1025
+          - 8025:8025
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: send
+        uses: .
+        with:
+          server_address: localhost
+          server_port: "1025"
+          secure: "false"
+          username: testuser
+          password: testpassword
+          ignore_cert: "true"
+          subject: "Envelope and Auth Test"
+          from: sender@example.com
+          to: recipient@example.com
+          envelope_from: envelope-sender@example.com
+          envelope_to: envelope-recipient@example.com
+          in_reply_to: "<original-message-id@example.com>"
+          body: "Testing envelope, auth, and cert options."
+
+      - name: Assert email was received
+        run: |
+          sleep 2
+          RESPONSE=$(curl -s http://localhost:8025/api/v2/messages)
+          echo "Mailhog response: $RESPONSE"
+          COUNT=$(echo "$RESPONSE" | grep -o '"total":[0-9]*' | grep -o '[0-9]*')
+          echo "Email count: $COUNT"
+          if [ -z "$COUNT" ] || [ "$COUNT" -lt 1 ]; then
+            echo "FAIL: Expected at least 1 email in mailhog, got: $COUNT"
+            exit 1
+          fi
+          echo "PASS: $COUNT email(s) received"
+
+      - name: Assert subject
+        run: |
+          RESPONSE=$(curl -s http://localhost:8025/api/v2/messages)
+          SUBJECT=$(echo "$RESPONSE" | python3 -c "import sys,json; msgs=json.load(sys.stdin)['items']; print(msgs[0]['Content']['Headers']['Subject'][0])" 2>/dev/null || echo "")
+          echo "Subject: $SUBJECT"
+          if [ "$SUBJECT" != "Envelope and Auth Test" ]; then
+            echo "FAIL: Expected subject 'Envelope and Auth Test', got '$SUBJECT'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert In-Reply-To header
+        run: |
+          RESPONSE=$(curl -s http://localhost:8025/api/v2/messages)
+          IN_REPLY_TO=$(echo "$RESPONSE" | python3 -c "import sys,json; msgs=json.load(sys.stdin)['items']; print(msgs[0]['Content']['Headers'].get('In-Reply-To', [''])[0])" 2>/dev/null || echo "")
+          echo "In-Reply-To: $IN_REPLY_TO"
+          if [ -z "$IN_REPLY_TO" ]; then
+            echo "FAIL: Expected In-Reply-To header to be set"
+            exit 1
+          fi
+          echo "PASS: In-Reply-To header is set to '$IN_REPLY_TO'"

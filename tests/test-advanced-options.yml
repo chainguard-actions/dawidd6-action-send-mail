@@ -4,31 +4,84 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      mailhog:
+        image: mailhog/mailhog:v1.0.1
+        ports:
+          - 1025:1025
+          - 8025:8025
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Start local SMTP server
-        run: |
-          python3 -m smtpd -n -c DebuggingServer localhost:1025 &
-          sleep 1
-          echo "SMTP server started"
-
-      - id: action
+      - id: send
         uses: .
         with:
-          connection_url: smtp://testuser:testpass@localhost:1025
-          subject: "Test Subject Advanced"
+          server_address: localhost
+          server_port: "1025"
+          secure: "false"
+          subject: "Advanced Options Test"
+          from: "Sender Name <sender@example.com>"
           to: recipient@example.com
-          from: "Test Sender <sender@example.com>"
-          html_body: "<h1>Hello</h1><p>This is an HTML email.</p>"
           cc: cc@example.com
           bcc: bcc@example.com
           reply_to: replyto@example.com
-          in_reply_to: "<original-message-id@example.com>"
+          body: "Testing advanced options."
           priority: high
           headers: '{"X-Custom-Header": "test-value"}'
 
-      - name: Assert action completed
+      - name: Assert email was received
         run: |
-          echo "Action completed successfully with advanced options"
+          sleep 2
+          RESPONSE=$(curl -s http://localhost:8025/api/v2/messages)
+          echo "Mailhog response: $RESPONSE"
+          COUNT=$(echo "$RESPONSE" | grep -o '"total":[0-9]*' | grep -o '[0-9]*')
+          echo "Email count: $COUNT"
+          if [ -z "$COUNT" ] || [ "$COUNT" -lt 1 ]; then
+            echo "FAIL: Expected at least 1 email in mailhog, got: $COUNT"
+            exit 1
+          fi
+          echo "PASS: $COUNT email(s) received"
+
+      - name: Assert email subject
+        run: |
+          RESPONSE=$(curl -s http://localhost:8025/api/v2/messages)
+          SUBJECT=$(echo "$RESPONSE" | python3 -c "import sys,json; msgs=json.load(sys.stdin)['items']; print(msgs[0]['Content']['Headers']['Subject'][0])" 2>/dev/null || echo "")
+          echo "Subject: $SUBJECT"
+          if [ "$SUBJECT" != "Advanced Options Test" ]; then
+            echo "FAIL: Expected subject 'Advanced Options Test', got '$SUBJECT'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert CC header
+        run: |
+          RESPONSE=$(curl -s http://localhost:8025/api/v2/messages)
+          CC=$(echo "$RESPONSE" | python3 -c "import sys,json; msgs=json.load(sys.stdin)['items']; print(msgs[0]['Content']['Headers'].get('Cc', [''])[0])" 2>/dev/null || echo "")
+          echo "CC: $CC"
+          if [ -z "$CC" ]; then
+            echo "FAIL: Expected CC header to be set"
+            exit 1
+          fi
+          echo "PASS: CC header is set to '$CC'"
+
+      - name: Assert Reply-To header
+        run: |
+          RESPONSE=$(curl -s http://localhost:8025/api/v2/messages)
+          REPLYTO=$(echo "$RESPONSE" | python3 -c "import sys,json; msgs=json.load(sys.stdin)['items']; print(msgs[0]['Content']['Headers'].get('Reply-To', [''])[0])" 2>/dev/null || echo "")
+          echo "Reply-To: $REPLYTO"
+          if [ -z "$REPLYTO" ]; then
+            echo "FAIL: Expected Reply-To header to be set"
+            exit 1
+          fi
+          echo "PASS: Reply-To header is set to '$REPLYTO'"
+
+      - name: Assert custom X-Priority header (high priority)
+        run: |
+          RESPONSE=$(curl -s http://localhost:8025/api/v2/messages)
+          PRIORITY=$(echo "$RESPONSE" | python3 -c "import sys,json; msgs=json.load(sys.stdin)['items']; print(msgs[0]['Content']['Headers'].get('X-Priority', [''])[0])" 2>/dev/null || echo "")
+          echo "X-Priority: $PRIORITY"
+          if [ "$PRIORITY" != "1 (Highest)" ]; then
+            echo "FAIL: Expected X-Priority '1 (Highest)' for high priority, got '$PRIORITY'"
+            exit 1
+          fi
           echo "PASS"

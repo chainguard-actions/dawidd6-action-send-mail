@@ -1,0 +1,27 @@
+name: Test connection URL
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Start local SMTP server
+        run: |
+          python3 -m smtpd -n -c DebuggingServer localhost:1025 &
+          sleep 1
+          echo "SMTP server started"
+
+      - id: send
+        uses: .
+        with:
+          connection_url: "smtp://localhost:1025"
+          subject: "Connection URL Test Email"
+          from: sender@example.com
+          to: recipient@example.com
+          body: "Sent via connection_url input"
+
+      - name: Assert step succeeded
+        run: |
+          echo "PASS: connection_url email send step completed without error"
