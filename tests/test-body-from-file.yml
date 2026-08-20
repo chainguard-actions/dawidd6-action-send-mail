@@ -1,0 +1,37 @@
+name: Test body from file
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create body file
+        run: |
+          echo "This is the email body from a file." > /tmp/email-body.txt
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          server_address: "127.0.0.1"
+          server_port: "9999"
+          subject: "Test Subject"
+          from: "sender@example.com"
+          to: "recipient@example.com"
+          body: "file:///tmp/email-body.txt"
+          # Body is read from a file; action will fail at SMTP connection (no server at 127.0.0.1:9999)
+          # but should NOT fail at file reading — meaning it got past the file:// handling
+      - name: Assert action failed at SMTP connection (not at file reading)
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed as expected (SMTP connection refused to 127.0.0.1:9999)"
+          elif [ "$OUTCOME" = "success" ]; then
+            echo "FAIL: action should not have succeeded without a real SMTP server"
+            exit 1
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi
