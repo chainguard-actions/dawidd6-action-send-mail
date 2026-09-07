@@ -1,0 +1,50 @@
+name: Test envelope, headers, ignore_cert, in_reply_to, and nodemailer options
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Start local SMTP server
+        run: |
+          python3 "$GITHUB_WORKSPACE/tests/fixtures/smtp_server.py" localhost 1025 &
+          echo "SMTP_PID=$!" >> $GITHUB_ENV
+          sleep 2
+
+      - id: send
+        uses: .
+        with:
+          server_address: localhost
+          server_port: "1025"
+          secure: "false"
+          ignore_cert: "true"
+          subject: "Envelope and Headers Test Email"
+          from: sender@example.com
+          to: recipient@example.com
+          body: "Testing envelope and custom headers."
+          envelope_from: envelope-sender@example.com
+          envelope_to: envelope-recipient@example.com
+          in_reply_to: "<original-message-id@example.com>"
+          headers: '{"X-Custom-Header": "test-value", "X-Test-Run": "act-harness"}'
+          nodemailerlog: "false"
+          nodemailerdebug: "false"
+
+      - name: Assert action succeeded
+        env:
+          OUTCOME: ${{ steps.send.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" != "success" ]; then
+            echo "FAIL: expected action to succeed with envelope/headers options, got: $OUTCOME"
+            exit 1
+          fi
+          echo "PASS: email with envelope_from, envelope_to, headers, ignore_cert, in_reply_to, nodemailerlog, nodemailerdebug sent successfully"
+
+      - name: Stop SMTP server
+        if: always()
+        run: |
+          if [ -n "$SMTP_PID" ]; then
+            kill "$SMTP_PID" 2>/dev/null || true
+          fi
