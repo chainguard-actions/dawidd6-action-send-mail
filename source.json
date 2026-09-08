@@ -1,6 +1,11 @@
 {
   "owner": "dawidd6",
   "repo": "action-send-mail",
-  "version": "",
-  "url": "https://github.com/dawidd6/action-send-mail"
+  "version": "v20",
+  "commit_sha": "ca8dbb4d4f91ca7f75e7f2feea5339e76ce70c90",
+  "url": "https://github.com/dawidd6/action-send-mail",
+  "policy_sha": "d636be7e43ef829af6e853da6b3c7566db9f72fe",
+  "test_policy_sha": "843adf9e4b8f85d0c08b27b9d0b09dd094b54702",
+  "test_agent_version": "2",
+  "harden_agent_version": "2"
 }

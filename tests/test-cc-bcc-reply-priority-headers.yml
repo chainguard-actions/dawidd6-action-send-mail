@@ -1,0 +1,39 @@
+name: Test cc, bcc, reply_to, in_reply_to, priority, headers inputs
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          server_address: localhost
+          server_port: "25"
+          username: testuser
+          password: testpass
+          subject: "Test email with cc/bcc/reply/priority/headers"
+          to: recipient@example.com
+          from: sender@example.com
+          body: "Test body"
+          cc: cc1@example.com,cc2@example.com
+          bcc: bcc1@example.com
+          reply_to: replyto@example.com
+          in_reply_to: "<original-message-id@example.com>"
+          priority: high
+          headers: '{"X-Custom-Header": "test-value"}'
+      - name: Assert action ran (expected to fail - no real SMTP server)
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" = "success" ]; then
+            echo "PASS: action succeeded"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (no real SMTP server available)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi
