@@ -1,0 +1,49 @@
+name: Test basic email send
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Start local SMTP server
+        run: |
+          # Start a simple SMTP debug server using Python's aiosmtpd
+          pip install aiosmtpd --quiet 2>/dev/null || true
+          python3 -m aiosmtpd -n -l 127.0.0.1:2525 &
+          SMTP_PID=$!
+          echo "SMTP_PID=$SMTP_PID" >> $GITHUB_ENV
+          # Wait for server to be ready
+          for i in $(seq 1 10); do
+            if nc -z 127.0.0.1 2525 2>/dev/null; then
+              echo "SMTP server is ready"
+              break
+            fi
+            sleep 1
+          done
+
+      - id: send-mail
+        uses: .
+        with:
+          server_address: 127.0.0.1
+          server_port: "2525"
+          secure: "false"
+          subject: "Test Email from act"
+          to: "recipient@example.com"
+          from: "sender@example.com"
+          body: "This is a test email sent from the act workflow test."
+
+      - name: Assert email was sent successfully
+        run: |
+          echo "Email send step completed"
+          echo "PASS: action completed without error"
+
+      - name: Stop SMTP server
+        if: always()
+        run: |
+          if [ -n "$SMTP_PID" ]; then
+            kill "$SMTP_PID" 2>/dev/null || true
+          fi
+          # Also kill any lingering aiosmtpd processes
+          pkill -f "aiosmtpd" 2>/dev/null || true

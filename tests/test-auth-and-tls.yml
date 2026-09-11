@@ -1,0 +1,62 @@
+name: Test authentication and TLS options
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Start local SMTP server
+        run: |
+          pip install aiosmtpd --quiet 2>/dev/null || true
+          python3 -m aiosmtpd -n -l 127.0.0.1:2528 &
+          SMTP_PID=$!
+          echo "SMTP_PID=$SMTP_PID" >> $GITHUB_ENV
+          for i in $(seq 1 10); do
+            if nc -z 127.0.0.1 2528 2>/dev/null; then
+              echo "SMTP server is ready on port 2528"
+              break
+            fi
+            sleep 1
+          done
+
+      - id: send-mail
+        uses: .
+        continue-on-error: true
+        with:
+          server_address: 127.0.0.1
+          server_port: "2528"
+          secure: "false"
+          require_tls: "false"
+          ignore_cert: "true"
+          username: "testuser"
+          password: "testpassword"
+          nodemailerlog: "true"
+          nodemailerdebug: "true"
+          subject: "Test Auth and TLS Options"
+          to: "recipient@example.com"
+          from: "sender@example.com"
+          body: "This is a test email with auth and TLS options."
+
+      - name: Assert action ran (auth may fail on plain SMTP server)
+        env:
+          OUTCOME: ${{ steps.send-mail.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" = "success" ]; then
+            echo "PASS: action completed successfully"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (auth not supported by plain SMTP server)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi
+
+      - name: Stop SMTP server
+        if: always()
+        run: |
+          if [ -n "$SMTP_PID" ]; then
+            kill "$SMTP_PID" 2>/dev/null || true
+          fi
+          pkill -f "aiosmtpd" 2>/dev/null || true

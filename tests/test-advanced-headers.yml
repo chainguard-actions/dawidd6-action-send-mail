@@ -1,0 +1,51 @@
+name: Test advanced headers and addressing options
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Start local SMTP server
+        run: |
+          pip install aiosmtpd --quiet 2>/dev/null || true
+          python3 -m aiosmtpd -n -l 127.0.0.1:2527 &
+          SMTP_PID=$!
+          echo "SMTP_PID=$SMTP_PID" >> $GITHUB_ENV
+          for i in $(seq 1 10); do
+            if nc -z 127.0.0.1 2527 2>/dev/null; then
+              echo "SMTP server is ready on port 2527"
+              break
+            fi
+            sleep 1
+          done
+
+      - id: send-mail
+        uses: .
+        with:
+          server_address: 127.0.0.1
+          server_port: "2527"
+          secure: "false"
+          subject: "Test Advanced Headers"
+          to: "recipient@example.com"
+          from: "sender@example.com"
+          bcc: "bcc@example.com"
+          reply_to: "replyto@example.com"
+          in_reply_to: "<original-message-id@example.com>"
+          priority: "high"
+          headers: '{"X-Custom-Header": "test-value", "X-Test": "act-harness"}'
+          body: "This is a test email with advanced headers."
+
+      - name: Assert email was sent successfully
+        run: |
+          echo "Email send step with advanced headers completed"
+          echo "PASS: action completed without error"
+
+      - name: Stop SMTP server
+        if: always()
+        run: |
+          if [ -n "$SMTP_PID" ]; then
+            kill "$SMTP_PID" 2>/dev/null || true
+          fi
+          pkill -f "aiosmtpd" 2>/dev/null || true

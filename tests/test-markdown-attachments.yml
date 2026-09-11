@@ -1,0 +1,60 @@
+name: Test markdown conversion, attachments, and envelope options
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Start local SMTP server
+        run: |
+          pip install aiosmtpd --quiet 2>/dev/null || true
+          python3 -m aiosmtpd -n -l 127.0.0.1:2529 &
+          SMTP_PID=$!
+          echo "SMTP_PID=$SMTP_PID" >> $GITHUB_ENV
+          for i in $(seq 1 10); do
+            if nc -z 127.0.0.1 2529 2>/dev/null; then
+              echo "SMTP server is ready on port 2529"
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Create attachment file
+        run: |
+          echo "This is a test attachment file." > /tmp/test-attachment.txt
+
+      - id: send-mail
+        uses: .
+        with:
+          server_address: 127.0.0.1
+          server_port: "2529"
+          secure: "false"
+          subject: "Test Markdown and Attachments"
+          to: "recipient@example.com"
+          from: "sender@example.com"
+          envelope_from: "bounce@example.com"
+          envelope_to: "recipient@example.com"
+          convert_markdown: "true"
+          attachments: "/tmp/test-attachment.txt"
+          body: |
+            # Hello World
+
+            This is a **markdown** email with an attachment.
+
+            - Item 1
+            - Item 2
+
+      - name: Assert email was sent successfully
+        run: |
+          echo "Email send step with markdown and attachments completed"
+          echo "PASS: action completed without error"
+
+      - name: Stop SMTP server
+        if: always()
+        run: |
+          if [ -n "$SMTP_PID" ]; then
+            kill "$SMTP_PID" 2>/dev/null || true
+          fi
+          pkill -f "aiosmtpd" 2>/dev/null || true

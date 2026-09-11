@@ -1,0 +1,46 @@
+name: Test connection URL format
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Start local SMTP server
+        run: |
+          pip install aiosmtpd --quiet 2>/dev/null || true
+          python3 -m aiosmtpd -n -l 127.0.0.1:2526 &
+          SMTP_PID=$!
+          echo "SMTP_PID=$SMTP_PID" >> $GITHUB_ENV
+          # Wait for server to be ready
+          for i in $(seq 1 10); do
+            if nc -z 127.0.0.1 2526 2>/dev/null; then
+              echo "SMTP server is ready on port 2526"
+              break
+            fi
+            sleep 1
+          done
+
+      - id: send-mail
+        uses: .
+        with:
+          connection_url: "smtp://127.0.0.1:2526"
+          subject: "Test HTML Email via connection_url"
+          to: "recipient@example.com"
+          from: "Sender Name <sender@example.com>"
+          html_body: "<h1>Hello</h1><p>This is an HTML test email.</p>"
+          cc: "cc@example.com"
+
+      - name: Assert email was sent successfully
+        run: |
+          echo "Email send step completed using connection_url"
+          echo "PASS: action completed without error"
+
+      - name: Stop SMTP server
+        if: always()
+        run: |
+          if [ -n "$SMTP_PID" ]; then
+            kill "$SMTP_PID" 2>/dev/null || true
+          fi
+          pkill -f "aiosmtpd" 2>/dev/null || true
