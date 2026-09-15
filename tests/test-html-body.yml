@@ -1,0 +1,50 @@
+name: Test HTML body email sending
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install aiosmtpd and start local SMTP server
+        run: |
+          pip install aiosmtpd --quiet --break-system-packages 2>/dev/null || \
+            pip install aiosmtpd --quiet
+          python3 -m aiosmtpd -n -l 127.0.0.1:1025 &
+          echo "SMTP_PID=$!" >> "$GITHUB_ENV"
+          # Wait for the server to be ready
+          for i in $(seq 1 10); do
+            if nc -z 127.0.0.1 1025 2>/dev/null; then
+              echo "SMTP server is ready"
+              break
+            fi
+            sleep 1
+          done
+
+      - id: send-mail
+        uses: .
+        with:
+          server_address: 127.0.0.1
+          server_port: "1025"
+          secure: "false"
+          subject: "Test HTML Email"
+          from: "sender@example.com"
+          to: "recipient@example.com"
+          html_body: "<h1>Hello</h1><p>This is an <strong>HTML</strong> email body.</p>"
+
+      - name: Assert action succeeded
+        run: |
+          echo "outcome: ${{ steps.send-mail.outcome }}"
+          if [ "${{ steps.send-mail.outcome }}" != "success" ]; then
+            echo "FAIL: expected action to succeed with HTML body"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Stop SMTP server
+        if: always()
+        run: |
+          if [ -n "$SMTP_PID" ]; then
+            kill "$SMTP_PID" 2>/dev/null || true
+          fi
