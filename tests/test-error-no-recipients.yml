@@ -1,0 +1,27 @@
+name: Test error when no recipients
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          server_address: 127.0.0.1
+          server_port: "2525"
+          subject: No recipients
+          from: sender@example.com
+          body: should not send
+      - name: Assert failure
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" != "failure" ]; then
+            echo "FAIL: expected failure when no to/cc/bcc given"
+            exit 1
+          fi
+          echo "PASS"

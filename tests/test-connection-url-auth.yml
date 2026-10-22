@@ -1,0 +1,39 @@
+name: Test connection_url with credentials
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Start fake SMTP server
+        run: |
+          rm -rf /tmp/smtp-out && mkdir -p /tmp/smtp-out
+          nohup node "$GITHUB_WORKSPACE/tests/fixtures/smtp-server.cjs" 2525 /tmp/smtp-out > /tmp/smtp-server.log 2>&1 &
+          for i in $(seq 1 30); do
+            if node -e "require('net').connect(2525,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"; then
+              echo "server ready"; exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/smtp-server.log
+          exit 1
+      - id: action
+        uses: .
+        with:
+          connection_url: smtp://testuser:s3cret%21@127.0.0.1:2525
+          subject: Auth test
+          to: carol@example.com
+          from: sender@example.com
+          body: auth body
+      - name: Assert authenticated and delivered
+        run: |
+          cat /tmp/smtp-out/session.log || true
+          if [ ! -f /tmp/smtp-out/auth.log ]; then echo "FAIL: no AUTH performed"; exit 1; fi
+          cat /tmp/smtp-out/auth.log
+          grep -qx 'USER=testuser' /tmp/smtp-out/auth.log || { echo "FAIL: username"; exit 1; }
+          grep -qx 'PASS=s3cret!' /tmp/smtp-out/auth.log || { echo "FAIL: password (should be unescaped)"; exit 1; }
+          f=/tmp/smtp-out/msg-1.eml
+          [ -f "$f" ] || { echo "FAIL: no message received"; exit 1; }
+          grep -q '^Subject: Auth test' "$f" || { echo "FAIL: subject"; exit 1; }
+          echo "PASS"

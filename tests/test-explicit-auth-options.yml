@@ -1,0 +1,49 @@
+name: Test explicit server/auth options with logging
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Start fake SMTP server
+        run: |
+          rm -rf /tmp/smtp-out && mkdir -p /tmp/smtp-out
+          nohup node "$GITHUB_WORKSPACE/tests/fixtures/smtp-server.cjs" 2525 /tmp/smtp-out > /tmp/smtp-server.log 2>&1 &
+          for i in $(seq 1 30); do
+            if node -e "require('net').connect(2525,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"; then
+              echo "server ready"; exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/smtp-server.log
+          exit 1
+      - id: action
+        uses: .
+        with:
+          server_address: 127.0.0.1
+          server_port: "2525"
+          secure: "false"
+          username: explicituser
+          password: explicitpass
+          ignore_cert: "true"
+          nodemailerlog: "true"
+          nodemailerdebug: "true"
+          subject: Explicit auth test
+          to: dave@example.com
+          from: Sender Name <sender@example.com>
+          body: explicit auth body
+      - name: Assert authenticated and delivered
+        run: |
+          cat /tmp/smtp-out/session.log || true
+          if [ ! -f /tmp/smtp-out/auth.log ]; then echo "FAIL: no AUTH performed"; exit 1; fi
+          cat /tmp/smtp-out/auth.log
+          grep -qx 'USER=explicituser' /tmp/smtp-out/auth.log || { echo "FAIL: username"; exit 1; }
+          grep -qx 'PASS=explicitpass' /tmp/smtp-out/auth.log || { echo "FAIL: password"; exit 1; }
+          f=/tmp/smtp-out/msg-1.eml
+          [ -f "$f" ] || { echo "FAIL: no message received"; exit 1; }
+          cat "$f"
+          grep -q '^Subject: Explicit auth test' "$f" || { echo "FAIL: subject"; exit 1; }
+          grep -q 'ENVELOPE-TO: <dave@example.com>' "$f" || { echo "FAIL: recipient"; exit 1; }
+          grep -q 'explicit auth body' "$f" || { echo "FAIL: body"; exit 1; }
+          echo "PASS"

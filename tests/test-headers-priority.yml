@@ -1,0 +1,45 @@
+name: Test custom headers, priority, reply-to
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Start fake SMTP server
+        run: |
+          rm -rf /tmp/smtp-out && mkdir -p /tmp/smtp-out
+          nohup node "$GITHUB_WORKSPACE/tests/fixtures/smtp-server.cjs" 2525 /tmp/smtp-out > /tmp/smtp-server.log 2>&1 &
+          for i in $(seq 1 30); do
+            if node -e "require('net').connect(2525,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"; then
+              echo "server ready"; exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/smtp-server.log
+          exit 1
+      - id: action
+        uses: .
+        with:
+          server_address: 127.0.0.1
+          server_port: "2525"
+          subject: Headers test
+          to: erin@example.com
+          from: sender@example.com
+          reply_to: replies@example.com
+          in_reply_to: <original-id@example.com>
+          priority: high
+          headers: '{"X-Custom-Header": "custom-value"}'
+          body: headers body
+      - name: Assert headers
+        run: |
+          f=/tmp/smtp-out/msg-1.eml
+          if [ ! -f "$f" ]; then echo "FAIL: no message received"; cat /tmp/smtp-out/session.log || true; exit 1; fi
+          cat "$f"
+          grep -q '^X-Custom-Header: custom-value' "$f" || { echo "FAIL: custom header"; exit 1; }
+          grep -q '^Reply-To: replies@example.com' "$f" || { echo "FAIL: Reply-To"; exit 1; }
+          grep -q '^In-Reply-To: <original-id@example.com>' "$f" || { echo "FAIL: In-Reply-To"; exit 1; }
+          grep -q '^References: <original-id@example.com>' "$f" || { echo "FAIL: References"; exit 1; }
+          grep -q '^X-Priority: 1' "$f" || { echo "FAIL: X-Priority"; exit 1; }
+          grep -qi '^Importance: High' "$f" || { echo "FAIL: Importance"; exit 1; }
+          echo "PASS"
