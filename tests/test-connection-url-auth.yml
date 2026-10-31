@@ -1,0 +1,38 @@
+name: Test connection_url with credentials
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Start local SMTP sink
+        run: |
+          rm -rf /tmp/mail-url && mkdir -p /tmp/mail-url
+          nohup python3 "$GITHUB_WORKSPACE/tests/fixtures/smtp_server.py" 2529 /tmp/mail-url > /tmp/smtp-url.log 2>&1 &
+          for i in $(seq 1 40); do
+            if python3 -c "import socket;socket.create_connection(('127.0.0.1',2529),1).close()" 2>/dev/null; then
+              echo "SMTP sink is up"; exit 0
+            fi
+            sleep 0.5
+          done
+          echo "FAIL: SMTP sink did not start"; cat /tmp/smtp-url.log; exit 1
+      - id: action
+        uses: .
+        with:
+          connection_url: smtp://testuser:s3cret@127.0.0.1:2529
+          server_address: should-be-overridden.invalid
+          subject: Connection URL test
+          from: sender@example.com
+          to: recipient@example.com
+          body: Sent via connection_url
+      - name: Assert message received with credentials
+        run: |
+          sleep 1
+          cat /tmp/smtp-url.log
+          MSG=/tmp/mail-url/msg-1.eml
+          if [ ! -f "$MSG" ]; then echo "FAIL: no message received"; exit 1; fi
+          cat "$MSG"
+          grep -q '^X-Test-Auth: testuser:s3cret$' "$MSG" || { echo "FAIL: credentials not used"; exit 1; }
+          grep -q '^Subject: Connection URL test' "$MSG" || { echo "FAIL: subject missing"; exit 1; }
+          echo "PASS"

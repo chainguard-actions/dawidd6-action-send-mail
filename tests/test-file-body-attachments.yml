@@ -1,0 +1,45 @@
+name: Test body from file and attachments
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Start local SMTP sink
+        run: |
+          rm -rf /tmp/mail-att && mkdir -p /tmp/mail-att
+          nohup python3 "$GITHUB_WORKSPACE/tests/fixtures/smtp_server.py" 2527 /tmp/mail-att > /tmp/smtp-att.log 2>&1 &
+          for i in $(seq 1 40); do
+            if python3 -c "import socket;socket.create_connection(('127.0.0.1',2527),1).close()" 2>/dev/null; then
+              echo "SMTP sink is up"; exit 0
+            fi
+            sleep 0.5
+          done
+          echo "FAIL: SMTP sink did not start"; cat /tmp/smtp-att.log; exit 1
+      - id: action
+        uses: .
+        with:
+          server_address: 127.0.0.1
+          server_port: "2527"
+          subject: Attachment test
+          from: sender@example.com
+          to: recipient@example.com
+          body: file://${{ github.workspace }}/tests/fixtures/body.txt
+          attachments: ${{ github.workspace }}/tests/fixtures/attachment-one.txt
+      - name: Assert body and attachment
+        run: |
+          sleep 1
+          cat /tmp/smtp-att.log
+          MSG=/tmp/mail-att/msg-1.eml
+          if [ ! -f "$MSG" ]; then echo "FAIL: no message received"; exit 1; fi
+          cat "$MSG"
+          grep -q 'marker-xyz' "$MSG" || { echo "FAIL: file body not loaded"; exit 1; }
+          if grep -q 'file://' "$MSG"; then echo "FAIL: raw file:// reference sent as body"; exit 1; fi
+          grep -qi 'multipart/mixed' "$MSG" || { echo "FAIL: not multipart"; exit 1; }
+          grep -q 'attachment-one.txt' "$MSG" || { echo "FAIL: attachment filename missing"; exit 1; }
+          # attachment content is base64 encoded
+          ENC=$(printf 'attachment content one\n' | base64 | tr -d '\n')
+          echo "expected base64: $ENC"
+          grep -q "$ENC" "$MSG" || { echo "FAIL: attachment content missing"; exit 1; }
+          echo "PASS"

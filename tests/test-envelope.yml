@@ -1,0 +1,44 @@
+name: Test custom envelope sender and recipients
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Start local SMTP sink
+        run: |
+          rm -rf /tmp/mail-env && mkdir -p /tmp/mail-env
+          nohup python3 "$GITHUB_WORKSPACE/tests/fixtures/smtp_server.py" 2530 /tmp/mail-env > /tmp/smtp-env.log 2>&1 &
+          for i in $(seq 1 40); do
+            if python3 -c "import socket;socket.create_connection(('127.0.0.1',2530),1).close()" 2>/dev/null; then
+              echo "SMTP sink is up"; exit 0
+            fi
+            sleep 0.5
+          done
+          echo "FAIL: SMTP sink did not start"; cat /tmp/smtp-env.log; exit 1
+      - id: action
+        uses: .
+        with:
+          server_address: 127.0.0.1
+          server_port: "2530"
+          subject: Envelope test
+          from: Header Sender <header@example.com>
+          to: header-to@example.com
+          envelope_from: bounce@example.com
+          envelope_to: real1@example.com, real2@example.com
+          body: Envelope body
+      - name: Assert envelope overrides
+        run: |
+          sleep 1
+          cat /tmp/smtp-env.log
+          MSG=/tmp/mail-env/msg-1.eml
+          if [ ! -f "$MSG" ]; then echo "FAIL: no message received"; exit 1; fi
+          cat "$MSG"
+          grep -q '^X-Test-Envelope-From: FROM:<bounce@example.com>' "$MSG" || { echo "FAIL: envelope from not overridden"; exit 1; }
+          grep -q '^X-Test-Envelope-To: TO:<real1@example.com>' "$MSG" || { echo "FAIL: real1 missing"; exit 1; }
+          grep -q '^X-Test-Envelope-To: TO:<real2@example.com>' "$MSG" || { echo "FAIL: real2 missing"; exit 1; }
+          if grep -q '^X-Test-Envelope-To: TO:<header-to@example.com>' "$MSG"; then echo "FAIL: header To used as envelope"; exit 1; fi
+          grep -q '^To: header-to@example.com' "$MSG" || { echo "FAIL: To header missing"; exit 1; }
+          grep -q '^From: Header Sender <header@example.com>' "$MSG" || { echo "FAIL: From header missing"; exit 1; }
+          echo "PASS"
