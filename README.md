@@ -15,6 +15,7 @@ Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at
 | v21 | [`v21`](https://github.com/chainguard-actions/dawidd6-action-send-mail/tree/v21) | [`03a02a4`](https://github.com/dawidd6/action-send-mail/commit/03a02a49409134de07636216fb379a026c52991e) | [`HARDENING.md`](https://github.com/chainguard-actions/dawidd6-action-send-mail/blob/v21/HARDENING.md) |
 | v22 | [`v22`](https://github.com/chainguard-actions/dawidd6-action-send-mail/tree/v22) | [`67ce355`](https://github.com/dawidd6/action-send-mail/commit/67ce3558d613188179559c61d3565140cf389968) | [`HARDENING.md`](https://github.com/chainguard-actions/dawidd6-action-send-mail/blob/v22/HARDENING.md) |
 | v23 | [`v23`](https://github.com/chainguard-actions/dawidd6-action-send-mail/tree/v23) | [`47af4a1`](https://github.com/dawidd6/action-send-mail/commit/47af4a10b540781705f283a2cf1a9650713ac795) | [`HARDENING.md`](https://github.com/chainguard-actions/dawidd6-action-send-mail/blob/v23/HARDENING.md) |
+| v24 | [`v24`](https://github.com/chainguard-actions/dawidd6-action-send-mail/tree/v24) | [`27bf7a8`](https://github.com/dawidd6/action-send-mail/commit/27bf7a883db6de205849f760badd38a1a3ce0dd0) | [`HARDENING.md`](https://github.com/chainguard-actions/dawidd6-action-send-mail/blob/v24/HARDENING.md) |
 
 ## Privacy
 
