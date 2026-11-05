@@ -1,1 +1,0 @@
-Body loaded from fixture file marker-xyz
